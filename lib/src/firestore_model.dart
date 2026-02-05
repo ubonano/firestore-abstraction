@@ -31,7 +31,7 @@ mixin FirestoreModelMixin {
 abstract class FirestoreModel with FirestoreModelMixin {
   FirestoreModel({DocumentReference<Map<String, dynamic>>? ref, String? id, DateTime? createdAt, DateTime? updatedAt}) {
     this.ref = ref;
-    this._id = id;
+    _id = id;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }

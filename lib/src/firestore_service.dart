@@ -55,9 +55,9 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     this.createdAtField = 'createdAt',
     this.updatedAtField = 'updatedAt',
     FirebaseFirestore? firestore,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _activeTransaction = null,
-        _activeBatch = null;
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _activeTransaction = null,
+       _activeBatch = null;
 
   /// Constructor for scoped instances (Internal use for subclasses).
   FirestoreService.protected({
@@ -70,9 +70,9 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     required this.updatedAtField,
     Transaction? transaction,
     WriteBatch? batch,
-  })  : _firestore = firestore,
-        _activeTransaction = transaction,
-        _activeBatch = batch;
+  }) : _firestore = firestore,
+       _activeTransaction = transaction,
+       _activeBatch = batch;
 
   /// Creates a copy of this service with the given transaction or batch.
   FirestoreService<T> copyWith({Transaction? transaction, WriteBatch? batch}) {
@@ -141,7 +141,7 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     return _firestore.collection(collectionPath);
   }
 
-  /// Referencia para consultas crudas (Map<String, dynamic>).
+  /// Referencia para consultas crudas (`Map<String, dynamic>`).
   Query<Map<String, dynamic>> get rawQueryReference {
     if (isCollectionGroup) {
       return _firestore.collectionGroup(collectionPath);
@@ -209,167 +209,167 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
 
   /// Crea un nuevo documento (o sobrescribe si ya tiene ref).
   Future<String> create(T item, {Transaction? transaction, WriteBatch? batch}) => execute(() async {
-        final data = toMap(item);
-        if (createdAtField != null) data[createdAtField!] = FieldValue.serverTimestamp();
-        if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
+    final data = toMap(item);
+    if (createdAtField != null) data[createdAtField!] = FieldValue.serverTimestamp();
+    if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
 
-        final activeTransaction = _activeTransaction ?? transaction;
-        final activeBatch = _activeBatch ?? batch;
+    final activeTransaction = _activeTransaction ?? transaction;
+    final activeBatch = _activeBatch ?? batch;
 
-        if (item.ref != null) {
-          final docRef = item.ref!;
-          if (activeTransaction != null) {
-            activeTransaction.set(docRef, data);
-            return docRef.id;
-          } else if (activeBatch != null) {
-            activeBatch.set(docRef, data);
-            return docRef.id;
-          } else {
-            await docRef.set(data);
-            return docRef.id;
-          }
+    if (item.ref != null) {
+      final docRef = item.ref!;
+      if (activeTransaction != null) {
+        activeTransaction.set(docRef, data);
+        return docRef.id;
+      } else if (activeBatch != null) {
+        activeBatch.set(docRef, data);
+        return docRef.id;
+      } else {
+        await docRef.set(data);
+        return docRef.id;
+      }
+    } else {
+      _checkWritePermission();
+      if (item.id != null && item.id!.isNotEmpty) {
+        final docRef = _rawCollectionRef.doc(item.id);
+        if (activeTransaction != null) {
+          activeTransaction.set(docRef, data);
+          return item.id!;
+        } else if (activeBatch != null) {
+          activeBatch.set(docRef, data);
+          return item.id!;
         } else {
-          _checkWritePermission();
-          if (item.id != null && item.id!.isNotEmpty) {
-            final docRef = _rawCollectionRef.doc(item.id);
-            if (activeTransaction != null) {
-              activeTransaction.set(docRef, data);
-              return item.id!;
-            } else if (activeBatch != null) {
-              activeBatch.set(docRef, data);
-              return item.id!;
-            } else {
-              await docRef.set(data);
-              return item.id!;
-            }
-          } else {
-            final docRef = _rawCollectionRef.doc();
-            if (activeTransaction != null) {
-              activeTransaction.set(docRef, data);
-              return docRef.id;
-            } else if (activeBatch != null) {
-              activeBatch.set(docRef, data);
-              return docRef.id;
-            } else {
-              await docRef.set(data);
-              return docRef.id;
-            }
-          }
+          await docRef.set(data);
+          return item.id!;
         }
-      });
+      } else {
+        final docRef = _rawCollectionRef.doc();
+        if (activeTransaction != null) {
+          activeTransaction.set(docRef, data);
+          return docRef.id;
+        } else if (activeBatch != null) {
+          activeBatch.set(docRef, data);
+          return docRef.id;
+        } else {
+          await docRef.set(data);
+          return docRef.id;
+        }
+      }
+    }
+  });
 
   /// Actualiza un documento completo REEMPLAZANDO su contenido (merge=true por defecto).
   Future<void> update(T item, {bool merge = true, Transaction? transaction, WriteBatch? batch}) => execute(() async {
-        DocumentReference<Map<String, dynamic>> docRef;
-        if (item.ref != null) {
-          docRef = item.ref!;
-        } else {
-          _checkWritePermission();
-          if (item.id == null || item.id!.isEmpty) {
-            throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
-          }
-          docRef = _rawCollectionRef.doc(item.id);
-        }
+    DocumentReference<Map<String, dynamic>> docRef;
+    if (item.ref != null) {
+      docRef = item.ref!;
+    } else {
+      _checkWritePermission();
+      if (item.id == null || item.id!.isEmpty) {
+        throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
+      }
+      docRef = _rawCollectionRef.doc(item.id);
+    }
 
-        final data = toMap(item);
-        if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
-        if (createdAtField != null) data.remove(createdAtField);
+    final data = toMap(item);
+    if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
+    if (createdAtField != null) data.remove(createdAtField);
 
-        final activeTransaction = _activeTransaction ?? transaction;
-        final activeBatch = _activeBatch ?? batch;
+    final activeTransaction = _activeTransaction ?? transaction;
+    final activeBatch = _activeBatch ?? batch;
 
-        if (activeTransaction != null) {
-          activeTransaction.set(docRef, data, SetOptions(merge: merge));
-        } else if (activeBatch != null) {
-          activeBatch.set(docRef, data, SetOptions(merge: merge));
-        } else {
-          await docRef.set(data, SetOptions(merge: merge));
-        }
-      });
+    if (activeTransaction != null) {
+      activeTransaction.set(docRef, data, SetOptions(merge: merge));
+    } else if (activeBatch != null) {
+      activeBatch.set(docRef, data, SetOptions(merge: merge));
+    } else {
+      await docRef.set(data, SetOptions(merge: merge));
+    }
+  });
 
   /// Elimina un documento por ID.
   Future<void> delete(String id, {Transaction? transaction, WriteBatch? batch}) => execute(() async {
-        _checkWritePermission();
-        final docRef = _rawCollectionRef.doc(id);
+    _checkWritePermission();
+    final docRef = _rawCollectionRef.doc(id);
 
-        final activeTransaction = _activeTransaction ?? transaction;
-        final activeBatch = _activeBatch ?? batch;
+    final activeTransaction = _activeTransaction ?? transaction;
+    final activeBatch = _activeBatch ?? batch;
 
-        if (activeTransaction != null) {
-          activeTransaction.delete(docRef);
-        } else if (activeBatch != null) {
-          activeBatch.delete(docRef);
-        } else {
-          await docRef.delete();
-        }
-      });
+    if (activeTransaction != null) {
+      activeTransaction.delete(docRef);
+    } else if (activeBatch != null) {
+      activeBatch.delete(docRef);
+    } else {
+      await docRef.delete();
+    }
+  });
 
   /// Elimina un item usando su referencia.
   Future<void> deleteItem(T item, {Transaction? transaction, WriteBatch? batch}) => execute(() async {
-        if (item.ref == null) {
-          if (item.id != null) {
-            return delete(item.id!, transaction: transaction, batch: batch);
-          }
-          throw FirestoreFailure('No se puede eliminar un item sin referencia ni ID', code: 'invalid-argument');
-        }
-        final docRef = item.ref!;
-        final activeTransaction = _activeTransaction ?? transaction;
-        final activeBatch = _activeBatch ?? batch;
+    if (item.ref == null) {
+      if (item.id != null) {
+        return delete(item.id!, transaction: transaction, batch: batch);
+      }
+      throw FirestoreFailure('No se puede eliminar un item sin referencia ni ID', code: 'invalid-argument');
+    }
+    final docRef = item.ref!;
+    final activeTransaction = _activeTransaction ?? transaction;
+    final activeBatch = _activeBatch ?? batch;
 
-        if (activeTransaction != null) {
-          activeTransaction.delete(docRef);
-        } else if (activeBatch != null) {
-          activeBatch.delete(docRef);
-        } else {
-          await docRef.delete();
-        }
-      });
+    if (activeTransaction != null) {
+      activeTransaction.delete(docRef);
+    } else if (activeBatch != null) {
+      activeBatch.delete(docRef);
+    } else {
+      await docRef.delete();
+    }
+  });
 
   // --- Lectura ---
 
   Future<T?> get(String id, {Transaction? transaction, GetOptions? options}) => execute(() async {
-        if (isCollectionGroup) {
-          final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
-          if (querySnap.docs.isEmpty) return null;
-          return querySnap.docs.first.data();
-        }
-        DocumentSnapshot<Map<String, dynamic>> snapshot;
-        if (transaction != null) {
-          snapshot = await transaction.get(_rawCollectionRef.doc(id));
-        } else {
-          snapshot = await _rawCollectionRef.doc(id).get(options);
-        }
-        if (!snapshot.exists || snapshot.data() == null) return null;
-        return fromMap(snapshot);
-      });
+    if (isCollectionGroup) {
+      final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
+      if (querySnap.docs.isEmpty) return null;
+      return querySnap.docs.first.data();
+    }
+    DocumentSnapshot<Map<String, dynamic>> snapshot;
+    if (transaction != null) {
+      snapshot = await transaction.get(_rawCollectionRef.doc(id));
+    } else {
+      snapshot = await _rawCollectionRef.doc(id).get(options);
+    }
+    if (!snapshot.exists || snapshot.data() == null) return null;
+    return fromMap(snapshot);
+  });
 
   Future<Map<String, dynamic>?> getRaw(String id, {Transaction? transaction, GetOptions? options}) => execute(() async {
-        DocumentSnapshot<Map<String, dynamic>> snapshot;
-        if (isCollectionGroup) {
-          final querySnap = await _firestore
-              .collectionGroup(collectionPath)
-              .where(FieldPath.documentId, isEqualTo: id)
-              .limit(1)
-              .get(options);
-          if (querySnap.docs.isEmpty) return null;
-          snapshot = querySnap.docs.first;
-        } else if (transaction != null) {
-          snapshot = await transaction.get(_rawCollectionRef.doc(id));
-        } else {
-          snapshot = await _rawCollectionRef.doc(id).get(options);
-        }
-        if (!snapshot.exists) return null;
-        return snapshot.data();
-      });
+    DocumentSnapshot<Map<String, dynamic>> snapshot;
+    if (isCollectionGroup) {
+      final querySnap = await _firestore
+          .collectionGroup(collectionPath)
+          .where(FieldPath.documentId, isEqualTo: id)
+          .limit(1)
+          .get(options);
+      if (querySnap.docs.isEmpty) return null;
+      snapshot = querySnap.docs.first;
+    } else if (transaction != null) {
+      snapshot = await transaction.get(_rawCollectionRef.doc(id));
+    } else {
+      snapshot = await _rawCollectionRef.doc(id).get(options);
+    }
+    if (!snapshot.exists) return null;
+    return snapshot.data();
+  });
 
   Future<bool> exists(String id, {GetOptions? options}) => execute(() async {
-        if (isCollectionGroup) {
-          final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
-          return querySnap.docs.isNotEmpty;
-        }
-        final snapshot = await _rawCollectionRef.doc(id).get(options);
-        return snapshot.exists;
-      });
+    if (isCollectionGroup) {
+      final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
+      return querySnap.docs.isNotEmpty;
+    }
+    final snapshot = await _rawCollectionRef.doc(id).get(options);
+    return snapshot.exists;
+  });
 
   Future<FirestoreResponse<T>?> getWithResponse(String id, {Transaction? transaction, GetOptions? options}) =>
       execute(() async {
@@ -391,10 +391,7 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
         return FirestoreResponse.fromSnapshot(snapshot, fromMap(snapshot));
       });
 
-  Stream<List<DocumentChange<T>>> streamChanges({
-    QueryBuilder<T>? queryBuilder,
-    bool includeMetadataChanges = false,
-  }) {
+  Stream<List<DocumentChange<T>>> streamChanges({QueryBuilder<T>? queryBuilder, bool includeMetadataChanges = false}) {
     Query<T> query = _queryRef;
     if (queryBuilder != null) {
       query = queryBuilder(query);
@@ -407,35 +404,34 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
   }
 
   Stream<List<T>> streamAll({bool includeMetadataChanges = false}) => executeStream(
-        _queryRef
-            .snapshots(includeMetadataChanges: includeMetadataChanges)
-            .map((snapshot) => snapshot.docs.map((d) => d.data()).toList()),
-      );
+    _queryRef
+        .snapshots(includeMetadataChanges: includeMetadataChanges)
+        .map((snapshot) => snapshot.docs.map((d) => d.data()).toList()),
+  );
 
   /// Ejecuta una consulta paginada.
   Future<FirestorePaginatedResult<T>> query(QueryBuilder<T>? queryBuilder, {GetOptions? options}) => execute(() async {
-        Query<T> query = _queryRef;
-        if (queryBuilder != null) {
-          query = queryBuilder(query);
-        }
-        final querySnapshot = await query.get(options);
-        final items = querySnapshot.docs.map((doc) => doc.data()).toList();
-        final lastDoc = querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null;
-        return FirestorePaginatedResult(items, lastDoc);
-      });
+    Query<T> query = _queryRef;
+    if (queryBuilder != null) {
+      query = queryBuilder(query);
+    }
+    final querySnapshot = await query.get(options);
+    final items = querySnapshot.docs.map((doc) => doc.data()).toList();
+    final lastDoc = querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null;
+    return FirestorePaginatedResult(items, lastDoc);
+  });
 
-  /// Ejecuta una consulta directa sobre la referencia cruda (Map<String, dynamic>).
+  /// Ejecuta una consulta directa sobre la referencia cruda (`Map<String, dynamic>`).
   Future<QuerySnapshot<Map<String, dynamic>>> queryRaw(
     QueryBuilder<Map<String, dynamic>>? queryBuilder, {
     GetOptions? options,
-  }) =>
-      execute(() async {
-        Query<Map<String, dynamic>> query = rawQueryReference;
-        if (queryBuilder != null) {
-          query = queryBuilder(query);
-        }
-        return await query.get(options);
-      });
+  }) => execute(() async {
+    Query<Map<String, dynamic>> query = rawQueryReference;
+    if (queryBuilder != null) {
+      query = queryBuilder(query);
+    }
+    return await query.get(options);
+  });
 
   Stream<List<T>> streamQuery(QueryBuilder<T> queryBuilder, {bool includeMetadataChanges = false}) {
     final query = queryBuilder(_queryRef);
@@ -466,9 +462,9 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
             .limit(1)
             .snapshots(includeMetadataChanges: includeMetadataChanges)
             .map((snapshot) {
-          if (snapshot.docs.isEmpty) return null;
-          return snapshot.docs.first.data();
-        }),
+              if (snapshot.docs.isEmpty) return null;
+              return snapshot.docs.first.data();
+            }),
       );
     }
     return executeStream(
@@ -487,10 +483,10 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
             .limit(1)
             .snapshots(includeMetadataChanges: includeMetadataChanges)
             .map((snapshot) {
-          if (snapshot.docs.isEmpty) return null;
-          final doc = snapshot.docs.first;
-          return FirestoreResponse.fromSnapshot(doc, doc.data());
-        }),
+              if (snapshot.docs.isEmpty) return null;
+              final doc = snapshot.docs.first;
+              return FirestoreResponse.fromSnapshot(doc, doc.data());
+            }),
       );
     }
     return executeStream(
@@ -528,8 +524,12 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
         countField = cf.count();
         fields.add(countField);
       }
-      for (final s in sum) fields.add(cf.sum(s));
-      for (final a in average) fields.add(cf.average(a));
+      for (final s in sum) {
+        fields.add(cf.sum(s));
+      }
+      for (final a in average) {
+        fields.add(cf.average(a));
+      }
 
       if (fields.isEmpty) return FirestoreAggregationResult(count: 0);
 
@@ -568,12 +568,7 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
         transaction: _activeTransaction,
       );
     }
-    return FirestoreService<S>(
-      firestore: _firestore,
-      collectionPath: newPath,
-      fromMap: fromMap,
-      toMap: toMap,
-    );
+    return FirestoreService<S>(firestore: _firestore, collectionPath: newPath, fromMap: fromMap, toMap: toMap);
   }
 
   Future<void> disableNetwork() => execute(() => _firestore.disableNetwork());
