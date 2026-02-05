@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as cf;
-import 'firestore_model.dart';
-import 'firestore_exceptions.dart';
-import 'firestore_results.dart';
+import '../models/firestore_model.dart';
+import '../exceptions/firestore_exceptions.dart';
+import '../models/firestore_results.dart';
 import 'firestore_transaction_service.dart';
 
 /// Definición de funciones para conversión de tipos

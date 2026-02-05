@@ -3,8 +3,8 @@
 /// More dartdocs go here.
 library;
 
-export 'src/firestore_service.dart';
-export 'src/firestore_model.dart';
-export 'src/firestore_results.dart';
-export 'src/firestore_exceptions.dart';
-export 'src/firestore_transaction_service.dart';
+export 'src/services/firestore_service.dart';
+export 'src/models/firestore_model.dart';
+export 'src/models/firestore_results.dart';
+export 'src/exceptions/firestore_exceptions.dart';
+export 'src/services/firestore_transaction_service.dart';

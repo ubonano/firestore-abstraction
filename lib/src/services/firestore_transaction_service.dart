@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firestore_service.dart';
-import 'firestore_model.dart';
+import '../models/firestore_model.dart';
 
 /// Servicio restringido para operaciones dentro de una transacción.
 /// Oculta métodos inseguros como Queries y Streams que no son soportados
