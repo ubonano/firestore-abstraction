@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' as cf;
 import '../models/firestore_model.dart';
 import '../exceptions/firestore_exceptions.dart';
 import '../models/firestore_results.dart';
-import 'firestore_transaction_service.dart';
 
 /// Definición de funciones para conversión de tipos
 typedef FromMap<T> = T Function(DocumentSnapshot<Map<String, dynamic>> snapshot);
@@ -44,9 +42,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
   final String? createdAtField;
   final String? updatedAtField;
 
-  final Transaction? _activeTransaction;
-  final WriteBatch? _activeBatch;
-
   FirestoreService({
     required this.collectionPath,
     required this.fromMap,
@@ -55,39 +50,7 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     this.createdAtField = 'createdAt',
     this.updatedAtField = 'updatedAt',
     FirebaseFirestore? firestore,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _activeTransaction = null,
-       _activeBatch = null;
-
-  /// Constructor for scoped instances (Internal use for subclasses).
-  FirestoreService.protected({
-    required this.collectionPath,
-    required this.fromMap,
-    required this.toMap,
-    required FirebaseFirestore firestore,
-    required this.isCollectionGroup,
-    required this.createdAtField,
-    required this.updatedAtField,
-    Transaction? transaction,
-    WriteBatch? batch,
-  }) : _firestore = firestore,
-       _activeTransaction = transaction,
-       _activeBatch = batch;
-
-  /// Creates a copy of this service with the given transaction or batch.
-  FirestoreService<T> copyWith({Transaction? transaction, WriteBatch? batch}) {
-    return FirestoreService.protected(
-      collectionPath: collectionPath,
-      fromMap: fromMap,
-      toMap: toMap,
-      firestore: _firestore,
-      isCollectionGroup: isCollectionGroup,
-      createdAtField: createdAtField,
-      updatedAtField: updatedAtField,
-      transaction: transaction,
-      batch: batch,
-    );
-  }
+  }) : _firestore = firestore ?? FirebaseFirestore.instance;
 
   // --- Referencias Públicas (Escape Hatches) ---
 
@@ -120,7 +83,7 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
 
   /// Creates a copy of this service but configured to query the Collection Group
   FirestoreService<T> asCollectionGroup() {
-    return FirestoreService.protected(
+    return FirestoreService(
       collectionPath: collectionPath,
       fromMap: fromMap,
       toMap: toMap,
@@ -128,8 +91,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
       isCollectionGroup: true,
       createdAtField: createdAtField,
       updatedAtField: updatedAtField,
-      transaction: _activeTransaction,
-      batch: _activeBatch,
     );
   }
 
@@ -169,42 +130,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     }
   }
 
-  // --- Transacciones ---
-
-  /// Internal: Runs a transaction. exposed only for advanced usage within library.
-  Future<R> _runTransaction<R>(Future<R> Function(Transaction transaction) action) {
-    _checkWritePermission();
-    return execute(() => _firestore.runTransaction(action));
-  }
-
-  /// Ejecuta un conjunto de escrituras de manera atómica y eficiente.
-  Future<void> runBatch(Future<void> Function(WriteBatch batch) action) {
-    _checkWritePermission();
-    return execute(() async {
-      final batch = _firestore.batch();
-      await action(batch);
-      await batch.commit();
-    });
-  }
-
-  /// Run a transaction providing a restricted scoped service.
-  /// Safest way to perform transactions.
-  Future<R> runTransactionScoped<R>(Future<R> Function(FirestoreTransactionService<T> service) action) {
-    return _runTransaction((transaction) {
-      // Creamos el helper restringido
-      final scopedService = FirestoreTransactionService(this, transaction);
-      return action(scopedService);
-    });
-  }
-
-  /// Ejecuta un batch y proporciona un servicio scoped que usa dicho batch automáticamente.
-  Future<void> runBatchScoped(Future<void> Function(FirestoreService<T> service) action) {
-    return runBatch((batch) async {
-      final scopedService = copyWith(batch: batch);
-      await action(scopedService);
-    });
-  }
-
   // --- Escritura ---
 
   /// Crea un nuevo documento (o sobrescribe si ya tiene ref).
@@ -213,49 +138,25 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     if (createdAtField != null) data[createdAtField!] = FieldValue.serverTimestamp();
     if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
 
-    final activeTransaction = _activeTransaction ?? transaction;
-    final activeBatch = _activeBatch ?? batch;
-
+    DocumentReference<Map<String, dynamic>> docRef;
     if (item.ref != null) {
-      final docRef = item.ref!;
-      if (activeTransaction != null) {
-        activeTransaction.set(docRef, data);
-        return docRef.id;
-      } else if (activeBatch != null) {
-        activeBatch.set(docRef, data);
-        return docRef.id;
-      } else {
-        await docRef.set(data);
-        return docRef.id;
-      }
+      docRef = item.ref!;
+    } else if (item.id != null && item.id!.isNotEmpty) {
+      _checkWritePermission();
+      docRef = _rawCollectionRef.doc(item.id);
     } else {
       _checkWritePermission();
-      if (item.id != null && item.id!.isNotEmpty) {
-        final docRef = _rawCollectionRef.doc(item.id);
-        if (activeTransaction != null) {
-          activeTransaction.set(docRef, data);
-          return item.id!;
-        } else if (activeBatch != null) {
-          activeBatch.set(docRef, data);
-          return item.id!;
-        } else {
-          await docRef.set(data);
-          return item.id!;
-        }
-      } else {
-        final docRef = _rawCollectionRef.doc();
-        if (activeTransaction != null) {
-          activeTransaction.set(docRef, data);
-          return docRef.id;
-        } else if (activeBatch != null) {
-          activeBatch.set(docRef, data);
-          return docRef.id;
-        } else {
-          await docRef.set(data);
-          return docRef.id;
-        }
-      }
+      docRef = _rawCollectionRef.doc();
     }
+
+    if (transaction != null) {
+      transaction.set(docRef, data);
+    } else if (batch != null) {
+      batch.set(docRef, data);
+    } else {
+      await docRef.set(data);
+    }
+    return docRef.id;
   });
 
   /// Actualiza un documento completo REEMPLAZANDO su contenido (merge=true por defecto).
@@ -275,13 +176,10 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     if (updatedAtField != null) data[updatedAtField!] = FieldValue.serverTimestamp();
     if (createdAtField != null) data.remove(createdAtField);
 
-    final activeTransaction = _activeTransaction ?? transaction;
-    final activeBatch = _activeBatch ?? batch;
-
-    if (activeTransaction != null) {
-      activeTransaction.set(docRef, data, SetOptions(merge: merge));
-    } else if (activeBatch != null) {
-      activeBatch.set(docRef, data, SetOptions(merge: merge));
+    if (transaction != null) {
+      transaction.set(docRef, data, SetOptions(merge: merge));
+    } else if (batch != null) {
+      batch.set(docRef, data, SetOptions(merge: merge));
     } else {
       await docRef.set(data, SetOptions(merge: merge));
     }
@@ -292,34 +190,10 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     _checkWritePermission();
     final docRef = _rawCollectionRef.doc(id);
 
-    final activeTransaction = _activeTransaction ?? transaction;
-    final activeBatch = _activeBatch ?? batch;
-
-    if (activeTransaction != null) {
-      activeTransaction.delete(docRef);
-    } else if (activeBatch != null) {
-      activeBatch.delete(docRef);
-    } else {
-      await docRef.delete();
-    }
-  });
-
-  /// Elimina un item usando su referencia.
-  Future<void> deleteItem(T item, {Transaction? transaction, WriteBatch? batch}) => execute(() async {
-    if (item.ref == null) {
-      if (item.id != null) {
-        return delete(item.id!, transaction: transaction, batch: batch);
-      }
-      throw FirestoreFailure('No se puede eliminar un item sin referencia ni ID', code: 'invalid-argument');
-    }
-    final docRef = item.ref!;
-    final activeTransaction = _activeTransaction ?? transaction;
-    final activeBatch = _activeBatch ?? batch;
-
-    if (activeTransaction != null) {
-      activeTransaction.delete(docRef);
-    } else if (activeBatch != null) {
-      activeBatch.delete(docRef);
+    if (transaction != null) {
+      transaction.delete(docRef);
+    } else if (batch != null) {
+      batch.delete(docRef);
     } else {
       await docRef.delete();
     }
@@ -370,26 +244,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     final snapshot = await _rawCollectionRef.doc(id).get(options);
     return snapshot.exists;
   });
-
-  Future<FirestoreResponse<T>?> getWithResponse(String id, {Transaction? transaction, GetOptions? options}) =>
-      execute(() async {
-        DocumentSnapshot<Map<String, dynamic>> snapshot;
-        if (isCollectionGroup) {
-          final querySnap = await _firestore
-              .collectionGroup(collectionPath)
-              .where(FieldPath.documentId, isEqualTo: id)
-              .limit(1)
-              .get(options);
-          if (querySnap.docs.isEmpty) return null;
-          snapshot = querySnap.docs.first;
-        } else if (transaction != null) {
-          snapshot = await transaction.get(_rawCollectionRef.doc(id));
-        } else {
-          snapshot = await _rawCollectionRef.doc(id).get(options);
-        }
-        if (!snapshot.exists || snapshot.data() == null) return null;
-        return FirestoreResponse.fromSnapshot(snapshot, fromMap(snapshot));
-      });
 
   Stream<List<DocumentChange<T>>> streamChanges({QueryBuilder<T>? queryBuilder, bool includeMetadataChanges = false}) {
     Query<T> query = _queryRef;
@@ -442,18 +296,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     );
   }
 
-  Stream<List<FirestoreResponse<T>>> streamQueryWithResponse(
-    QueryBuilder<T> queryBuilder, {
-    bool includeMetadataChanges = true,
-  }) {
-    final query = queryBuilder(_queryRef);
-    return executeStream(
-      query.snapshots(includeMetadataChanges: includeMetadataChanges).map((snapshot) {
-        return snapshot.docs.map((d) => FirestoreResponse.fromSnapshot(d, d.data())).toList();
-      }),
-    );
-  }
-
   Stream<T?> streamDocument(String id, {bool includeMetadataChanges = false}) {
     if (isCollectionGroup) {
       return executeStream(
@@ -475,126 +317,14 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
     );
   }
 
-  Stream<FirestoreResponse<T>?> streamDocumentWithResponse(String id, {bool includeMetadataChanges = true}) {
-    if (isCollectionGroup) {
-      return executeStream(
-        _queryRef
-            .where(FieldPath.documentId, isEqualTo: id)
-            .limit(1)
-            .snapshots(includeMetadataChanges: includeMetadataChanges)
-            .map((snapshot) {
-              if (snapshot.docs.isEmpty) return null;
-              final doc = snapshot.docs.first;
-              return FirestoreResponse.fromSnapshot(doc, doc.data());
-            }),
-      );
-    }
-    return executeStream(
-      _collectionRef.doc(id).snapshots(includeMetadataChanges: includeMetadataChanges).map((snapshot) {
-        if (!snapshot.exists || snapshot.data() == null) return null;
-        return FirestoreResponse.fromSnapshot(snapshot, snapshot.data());
-      }),
-    );
-  }
-
   // --- Agregaciones ---
-
-  /// Realiza múltiples agregaciones en una sola llamada eficiente.
-  Future<FirestoreAggregationResult> aggregate(
-    QueryBuilder<T>? queryBuilder, {
-    bool count = true,
-    List<String> sum = const [],
-    List<String> average = const [],
-  }) {
-    return execute(() async {
-      Query<T> query = _queryRef;
-      if (queryBuilder != null) {
-        query = queryBuilder(query);
-      }
-
-      AggregateQuery aggQuery; // No default init needed properly if we use count correctly below
-
-      if (!count && sum.isEmpty && average.isEmpty) {
-        return FirestoreAggregationResult(count: 0);
-      }
-
-      final List<AggregateField> fields = [];
-      AggregateField? countField;
-      if (count) {
-        countField = cf.count();
-        fields.add(countField);
-      }
-      for (final s in sum) {
-        fields.add(cf.sum(s));
-      }
-      for (final a in average) {
-        fields.add(cf.average(a));
-      }
-
-      if (fields.isEmpty) return FirestoreAggregationResult(count: 0);
-
-      // Usamos Function.apply para pasar la lista de argumentos posicionales
-      // ya que query.aggregate espera (field1, [field2, ...])
-      // ignore: avoid_dynamic_calls
-      aggQuery = Function.apply(query.aggregate, fields) as AggregateQuery;
-
-      final snapshot = await aggQuery.get();
-
-      return FirestoreAggregationResult(
-        count: count ? snapshot.count : null,
-        sums: {for (final s in sum) s: snapshot.getSum(s) ?? 0.0},
-        averages: {for (final a in average) a: snapshot.getAverage(a) ?? 0.0},
-      );
-    });
-  }
 
   FirestoreService<S> subCollection<S extends FirestoreModelMixin>(
     String path, {
-    String? parentId,
     required FromMap<S> fromMap,
     required ToMap<S> toMap,
   }) {
-    final newPath = parentId != null ? '$collectionPath/$parentId/$path' : '$collectionPath/$path';
-
-    if (_activeTransaction != null) {
-      return FirestoreService<S>.protected(
-        firestore: _firestore,
-        collectionPath: newPath,
-        fromMap: fromMap,
-        toMap: toMap,
-        isCollectionGroup: false,
-        createdAtField: createdAtField,
-        updatedAtField: updatedAtField,
-        transaction: _activeTransaction,
-      );
-    }
+    final newPath = '$collectionPath/$path';
     return FirestoreService<S>(firestore: _firestore, collectionPath: newPath, fromMap: fromMap, toMap: toMap);
-  }
-
-  Future<void> disableNetwork() => execute(() => _firestore.disableNetwork());
-  Future<void> enableNetwork() => execute(() => _firestore.enableNetwork());
-  Future<void> clearPersistence() => execute(() => _firestore.clearPersistence());
-  Future<void> waitForPendingWrites() => execute(() => _firestore.waitForPendingWrites());
-}
-
-extension AggregateQuerySnapshotX on AggregateQuerySnapshot {
-  // Helper extension methods since the API might return different types
-  // or to standardize access.
-  double? getSum(String field) {
-    try {
-      // ignore: avoid_dynamic_calls
-      return (this as dynamic).get(cf.sum(field))?.toDouble();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  double? getAverage(String field) {
-    try {
-      // ignore: avoid_dynamic_calls
-      return (this as dynamic).get(cf.average(field))?.toDouble();
-    } catch (_) {
-      return null;
-    }
   }
 }

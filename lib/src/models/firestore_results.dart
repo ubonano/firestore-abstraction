@@ -34,16 +34,3 @@ class FirestoreResponse<T> {
     );
   }
 }
-
-/// Resultado unificado de una operación de agregación.
-class FirestoreAggregationResult {
-  final int? count;
-  final Map<String, double> sums;
-  final Map<String, double> averages;
-
-  FirestoreAggregationResult({
-    this.count,
-    this.sums = const {},
-    this.averages = const {},
-  });
-}
