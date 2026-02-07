@@ -1,4 +1,3 @@
-/// Representa un error ocurrido durante una operación de Firestore.
 class FirestoreFailure implements Exception {
   final String message;
   final String? code;
@@ -9,7 +8,6 @@ class FirestoreFailure implements Exception {
   @override
   String toString() => 'FirestoreFailure(message: $message, code: $code)';
 
-  /// Factory para crear errores comunes
   factory FirestoreFailure.notFound(String id) => FirestoreFailure('Documento no encontrado: $id', code: 'not-found');
 
   factory FirestoreFailure.permissionDenied() =>
