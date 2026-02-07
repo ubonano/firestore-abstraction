@@ -7,7 +7,11 @@ typedef FromMap<T> = T Function(DocumentSnapshot<Map<String, dynamic>> snapshot)
 typedef ToMap<T> = Map<String, dynamic> Function(T item);
 typedef QueryBuilder<T> = Query<T> Function(Query<T> query);
 
+/// Mixin for handling exceptions standardized across Firestore services.
+///
+/// Wraps generic [FirebaseException]s into domain-specific [FirestoreFailure]s.
 mixin FirestoreErrorHandler {
+  /// Executes a future and handles errors.
   Future<R> execute<R>(Future<R> Function() action) async {
     try {
       return await action();
@@ -18,6 +22,7 @@ mixin FirestoreErrorHandler {
     }
   }
 
+  /// Wraps a stream to handle errors effectively.
   Stream<R> executeStream<R>(Stream<R> stream) {
     return stream.handleError((e) {
       if (e is FirebaseException) {
@@ -28,12 +33,24 @@ mixin FirestoreErrorHandler {
   }
 }
 
+/// Base service for read-only Firestore access.
+///
+/// Provides methods to fetch ([get]), check existence ([exists]), and query ([query], [getAll])
+/// documents. It does not contain any methods that modify data.
 class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErrorHandler {
+  /// The underlying Firestore instance.
   final FirebaseFirestore firestore;
+
+  /// The path to the collection (e.g., 'users' or 'users/123/orders').
   final String collectionPath;
+
+  /// Function to deserialize data into model [T].
   final FromMap<T> fromMap;
+
+  /// Whether this service targets a Collection Group query.
   final bool isCollectionGroup;
 
+  /// Creates a new [FirestoreReadOnlyService].
   FirestoreReadOnlyService({
     required this.collectionPath,
     required this.fromMap,
@@ -41,6 +58,9 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     FirebaseFirestore? firestore,
   }) : firestore = firestore ?? FirebaseFirestore.instance;
 
+  /// Returns the base [Query] for reading.
+  ///
+  /// Handles `collection` vs `collectionGroup` logic and applies the type converter.
   Query<T> get queryReference {
     Query<Map<String, dynamic>> rawQuery;
     if (isCollectionGroup) {
@@ -56,6 +76,9 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
 
   Query<T> get _queryRef => queryReference;
 
+  /// Fetches a single document by its [id].
+  ///
+  /// Returns `null` if the document does not exist.
   Future<T?> get(String id, {GetOptions? options}) => execute(() async {
     if (isCollectionGroup) {
       final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
@@ -68,6 +91,7 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     return fromMap(snapshot);
   });
 
+  /// Checks if a document exists.
   Future<bool> exists(String id, {GetOptions? options}) => execute(() async {
     if (isCollectionGroup) {
       final querySnap = await _queryRef.where(FieldPath.documentId, isEqualTo: id).limit(1).get(options);
@@ -78,6 +102,7 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     return snapshot.exists;
   });
 
+  /// Fetches all documents matching the optional [queryBuilder].
   Future<List<T>> getAll({QueryBuilder<T>? queryBuilder, GetOptions? options}) => execute(() async {
     Query<T> query = _queryRef;
     if (queryBuilder != null) {
@@ -87,6 +112,7 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     return querySnapshot.docs.map((doc) => doc.data()).toList();
   });
 
+  /// Streams real-time updates for a list of documents.
   Stream<List<T>> streamAll({QueryBuilder<T>? queryBuilder, bool includeMetadataChanges = false}) {
     Query<T> query = _queryRef;
     if (queryBuilder != null) {
@@ -99,6 +125,7 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     );
   }
 
+  /// Streams real-time updates for a single document.
   Stream<T?> streamDocument(String id, {bool includeMetadataChanges = false}) {
     if (isCollectionGroup) {
       return executeStream(
@@ -122,6 +149,7 @@ class FirestoreReadOnlyService<T extends FirestoreModelMixin> with FirestoreErro
     );
   }
 
+  /// Performs a paginated query and returns the results along with the cursor for the next page.
   Future<FirestorePaginatedResult<T>> query(QueryBuilder<T>? queryBuilder, {GetOptions? options}) => execute(() async {
     Query<T> query = _queryRef;
     if (queryBuilder != null) {
