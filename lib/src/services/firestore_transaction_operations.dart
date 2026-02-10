@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../mixins/firestore_model_mixin.dart';
-import '../exceptions/firestore_exceptions.dart';
+import '../utils/firestore_model_mixin.dart';
+import '../utils/firestore_exceptions.dart';
 
 /// Helper class for managing transaction-scoped operations.
 ///

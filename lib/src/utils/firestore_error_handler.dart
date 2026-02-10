@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../exceptions/firestore_exceptions.dart';
+import 'firestore_exceptions.dart';
 
 /// Mixin for handling exceptions standardized across Firestore services.
 ///
