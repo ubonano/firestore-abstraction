@@ -34,7 +34,7 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
       item: item,
     );
 
-    final data = FirestoreHelper.prepareData(item.toMap(), isCreate: true);
+    final data = item.toMap();
 
     _transaction.set(docRef, data);
   }
@@ -51,20 +51,18 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
       item: item,
     );
 
-    final data = FirestoreHelper.prepareData(item.toMap(), isCreate: false);
+    final data = item.toMap();
 
     _transaction.set(docRef, data, SetOptions(merge: merge));
   }
 
   /// Queues a partial update operation in the transaction.
   ///
-  /// Included automatic [updatedAt] management.
+
   void updatePartial(String id, Map<String, dynamic> data) {
     final docRef = _collectionRef.doc(id);
 
-    // Automatically append updatedAt
     final dataToUpdate = Map<String, dynamic>.from(data);
-    dataToUpdate['updatedAt'] = FieldValue.serverTimestamp();
 
     _transaction.update(docRef, dataToUpdate);
   }

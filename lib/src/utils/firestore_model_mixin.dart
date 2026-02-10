@@ -22,12 +22,6 @@ mixin FirestoreModelMixin {
   /// Sets the unique identifier of the document.
   set id(String? value) => _id = value;
 
-  /// The date and time when the document was created.
-  DateTime? createdAt;
-
-  /// The date and time when the document was last updated.
-  DateTime? updatedAt;
-
   /// Converts the object to a [Map] representation for Firestore.
   ///
   /// This method must be implemented by consuming classes to define how

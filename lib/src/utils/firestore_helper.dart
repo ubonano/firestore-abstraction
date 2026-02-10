@@ -22,38 +22,6 @@ class FirestoreHelper {
     }
   }
 
-  /// Prepares the data map for writing to Firestore.
-  ///
-  /// Injects [FieldValue.serverTimestamp] for `createdAt` (if [isCreate] is true)
-  /// and `updatedAt`, ensuring server-side time consistency.
-  static Map<String, dynamic> prepareData(Map<String, dynamic> data, {bool isCreate = false}) {
-    final map = Map<String, dynamic>.from(data);
-
-    // We use FieldValue.serverTimestamp() to ensure consistency and avoid client-time issues.
-    if (isCreate) {
-      map['createdAt'] = FieldValue.serverTimestamp();
-      map['updatedAt'] = FieldValue.serverTimestamp();
-    } else {
-      map['updatedAt'] = FieldValue.serverTimestamp();
-      // Ensure we don't accidentally overwrite createdAt on updates if it's not present (standard behavior)
-      // but if the user passed it in 'data', it would be there.
-      // Typically, models might include createdAt in toMap.
-      // If we are updating, we usually want to preserve existing createdAt.
-      // If the map has it, we leave it (or the server ignores it if we only send partial data?
-      // But update(item) usually replaces fields).
-      // However, if we use SetOptions(merge: true), fields not in map are preserved.
-      // To be safe, we usually don't remove createdAt from the map if it's there,
-      // but for updates we definitely enforce updatedAt.
-    }
-
-    // Ensure ID and Ref are not part of the persisted data to avoid redundancy/recursion issues
-    map.remove('id');
-    map.remove('ref');
-
-    return map;
-  }
-
-  /// Executes a [Future] and handles errors.
   static Future<T> execute<T>(Future<T> Function() action) async {
     try {
       return await action();

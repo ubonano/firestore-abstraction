@@ -127,7 +127,7 @@ class FirestoreService<T extends FirestoreModelMixin> {
   Future<String> create(T item) => FirestoreHelper.execute(() async {
     final docRef = FirestoreHelper.getDocumentRef(firestore: firestore, collectionPath: collectionPath, item: item);
 
-    final data = FirestoreHelper.prepareData(toMap(item), isCreate: true);
+    final data = toMap(item);
 
     await docRef.set(data);
     return docRef.id;
@@ -147,7 +147,7 @@ class FirestoreService<T extends FirestoreModelMixin> {
 
     final docRef = FirestoreHelper.getDocumentRef(firestore: firestore, collectionPath: collectionPath, item: item);
 
-    final data = FirestoreHelper.prepareData(toMap(item), isCreate: false);
+    final data = toMap(item);
 
     await docRef.set(data, SetOptions(merge: merge));
   });
@@ -155,15 +155,13 @@ class FirestoreService<T extends FirestoreModelMixin> {
   /// Updates specific fields of a document without overwriting the entire document.
   ///
   /// This method allows for atomic updates using [FieldValue]s (e.g., [FieldValue.increment],
-  /// [FieldValue.arrayUnion]) and ensures that [updatedAt] is automatically set.
+  /// [FieldValue.arrayUnion]).
   ///
   /// [data] must not contain the `id` or `ref` as keys.
   Future<void> updatePartial(String id, Map<String, dynamic> data) => FirestoreHelper.execute(() async {
     final docRef = collectionReference.doc(id);
 
-    // Automatically append updatedAt
     final dataToUpdate = Map<String, dynamic>.from(data);
-    dataToUpdate['updatedAt'] = FieldValue.serverTimestamp();
 
     await docRef.update(dataToUpdate);
   });
