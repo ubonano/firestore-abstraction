@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_exceptions.dart';
+import '../utils/firestore_helper.dart';
 
 /// Helper class for managing transaction-scoped operations.
 ///
@@ -27,40 +28,32 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
 
   /// Queues a create operation in the transaction.
   void create(T item) {
-    DocumentReference<T> docRef;
-    if (item.ref != null) {
-      docRef = _collectionRef.doc(item.ref!.id);
-    } else if (item.id != null && item.id!.isNotEmpty) {
-      docRef = _collectionRef.doc(item.id);
-    } else {
-      docRef = _collectionRef.doc();
-    }
+    final docRef = FirestoreHelper.getDocumentRef(
+      firestore: _firestore,
+      collectionPath: _collectionRef.path,
+      item: item,
+    );
 
-    item.ref = _firestore.doc(docRef.path);
+    final data = FirestoreHelper.prepareData(item.toMap(), isCreate: true);
 
-    // Assign automatic audit fields
-    item.createdAt = DateTime.now();
-    item.updatedAt = item.createdAt;
-
-    _transaction.set(docRef, item);
+    _transaction.set(docRef, data);
   }
 
   /// Queues an update operation in the transaction.
   void update(T item, {bool merge = true}) {
-    DocumentReference<T> docRef;
-    if (item.ref != null) {
-      docRef = _collectionRef.doc(item.ref!.id);
-    } else {
-      if (item.id == null || item.id!.isEmpty) {
-        throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
-      }
-      docRef = _collectionRef.doc(item.id);
+    if (item.id == null && item.ref == null) {
+      throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
     }
 
-    // Assign automatic audit field
-    item.updatedAt = DateTime.now();
+    final docRef = FirestoreHelper.getDocumentRef(
+      firestore: _firestore,
+      collectionPath: _collectionRef.path,
+      item: item,
+    );
 
-    _transaction.set(docRef, item, SetOptions(merge: merge));
+    final data = FirestoreHelper.prepareData(item.toMap(), isCreate: false);
+
+    _transaction.set(docRef, data, SetOptions(merge: merge));
   }
 
   /// Queues a partial update operation in the transaction.
