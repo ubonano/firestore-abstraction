@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_paginated_result.dart';
 
-import '../utils/firestore_exceptions.dart';
+import '../utils/firestore_failure.dart';
 import '../utils/firestore_helper.dart';
 import 'firestore_transaction_operations.dart';
 

@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firestore_model_mixin.dart';
-import 'firestore_exceptions.dart';
+import 'firestore_failure.dart';
 
 /// Helper class for shared Firestore logic.
 class FirestoreHelper {
