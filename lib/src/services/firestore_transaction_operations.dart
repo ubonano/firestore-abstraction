@@ -38,6 +38,10 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
 
     item.ref = _firestore.doc(docRef.path);
 
+    // Assign automatic audit fields
+    item.createdAt = DateTime.now();
+    item.updatedAt = item.createdAt;
+
     _transaction.set(docRef, item);
   }
 
@@ -53,9 +57,30 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
       docRef = _collectionRef.doc(item.id);
     }
 
+    // Assign automatic audit field
+    item.updatedAt = DateTime.now();
+
     _transaction.set(docRef, item, SetOptions(merge: merge));
   }
 
+  /// Queues a partial update operation in the transaction.
+  ///
+  /// Included automatic [updatedAt] management.
+  void updatePartial(String id, Map<String, dynamic> data) {
+    final docRef = _collectionRef.doc(id);
+
+    // Automatically append updatedAt
+    final dataToUpdate = Map<String, dynamic>.from(data);
+    dataToUpdate['updatedAt'] = FieldValue.serverTimestamp();
+
+    _transaction.update(docRef, dataToUpdate);
+  }
+
   /// Queues a delete operation in the transaction.
-  void delete(String id) => _transaction.delete(_collectionRef.doc(id));
+  void delete(String id) {
+    if (id.isEmpty) {
+      throw FirestoreFailure('El ID del documento no puede estar vacío', code: 'invalid-argument');
+    }
+    _transaction.delete(_collectionRef.doc(id));
+  }
 }

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_paginated_result.dart';
 import '../utils/firestore_executor.dart';
+import '../utils/firestore_exceptions.dart';
 import 'firestore_transaction_operations.dart';
 
 typedef FromMap<T> = T Function(DocumentSnapshot<Map<String, dynamic>> snapshot);
@@ -135,6 +136,10 @@ class FirestoreService<T extends FirestoreModelMixin> {
     // Assign the generated reference back to the item for immediate usage
     item.ref = firestore.doc(docRef.path);
 
+    // Assign automatic audit fields
+    item.createdAt = DateTime.now();
+    item.updatedAt = item.createdAt;
+
     await docRef.set(item);
     return docRef.id;
   });
@@ -152,16 +157,40 @@ class FirestoreService<T extends FirestoreModelMixin> {
       docRef = collectionReference.doc(item.ref!.id);
     } else {
       if (item.id == null || item.id!.isEmpty) {
-        throw Exception('No se puede actualizar un documento sin ID o Referencia');
+        throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
       }
       docRef = collectionReference.doc(item.id);
     }
 
+    // Assign automatic audit field
+    item.updatedAt = DateTime.now();
+
     await docRef.set(item, SetOptions(merge: merge));
   });
 
+  /// Updates specific fields of a document without overwriting the entire document.
+  ///
+  /// This method allows for atomic updates using [FieldValue]s (e.g., [FieldValue.increment],
+  /// [FieldValue.arrayUnion]) and ensures that [updatedAt] is automatically set.
+  ///
+  /// [data] must not contain the `id` or `ref` as keys.
+  Future<void> updatePartial(String id, Map<String, dynamic> data) => FirestoreExecutor.execute(() async {
+    final docRef = collectionReference.doc(id);
+
+    // Automatically append updatedAt
+    final dataToUpdate = Map<String, dynamic>.from(data);
+    dataToUpdate['updatedAt'] = FieldValue.serverTimestamp();
+
+    await docRef.update(dataToUpdate);
+  });
+
   /// Deletes a document by its [id].
-  Future<void> delete(String id) => FirestoreExecutor.execute(() async => await collectionReference.doc(id).delete());
+  Future<void> delete(String id) => FirestoreExecutor.execute(() async {
+    if (id.isEmpty) {
+      throw FirestoreFailure('El ID del documento no puede estar vacío', code: 'invalid-argument');
+    }
+    await collectionReference.doc(id).delete();
+  });
 
   /// Provides access to transaction-scoped operations.
   ///
