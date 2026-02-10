@@ -8,6 +8,6 @@
 library;
 
 export 'src/services/firestore_service.dart';
-export 'src/classes/firestore_model.dart';
+export 'src/mixins/firestore_model_mixin.dart';
 export 'src/classes/firestore_results.dart';
 export 'src/exceptions/firestore_exceptions.dart';

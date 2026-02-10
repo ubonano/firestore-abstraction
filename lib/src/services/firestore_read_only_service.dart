@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../classes/firestore_model.dart';
+import '../mixins/firestore_model_mixin.dart';
 import '../classes/firestore_results.dart';
 import '../mixins/firestore_error_handler.dart';
 

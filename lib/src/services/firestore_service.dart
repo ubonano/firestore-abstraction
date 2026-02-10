@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../classes/firestore_model.dart';
+import '../mixins/firestore_model_mixin.dart';
 import 'firestore_read_only_service.dart';
 import 'firestore_batch_operations.dart';
 import 'firestore_transaction_operations.dart';
