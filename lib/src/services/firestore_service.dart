@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_paginated_result.dart';
 import '../utils/firestore_error_handler.dart';
-import 'firestore_batch_operations.dart';
 import 'firestore_transaction_operations.dart';
 
 typedef FromMap<T> = T Function(DocumentSnapshot<Map<String, dynamic>> snapshot);
@@ -170,14 +169,6 @@ class FirestoreService<T extends FirestoreModelMixin> with FirestoreErrorHandler
   Future<void> delete(String id) => execute(() async {
     await collectionReference.doc(id).delete();
   });
-
-  /// Provides access to batch operations for this collection.
-  ///
-  /// Returns a [FirestoreBatchOperations] helper that can queue writes
-  /// on the provided [batch] or a new one.
-  FirestoreBatchOperations<T> batch(WriteBatch batch) {
-    return FirestoreBatchOperations(batch, collectionReference, firestore);
-  }
 
   /// Provides access to transaction-scoped operations.
   ///
