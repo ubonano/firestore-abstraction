@@ -57,7 +57,5 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
   }
 
   /// Queues a delete operation in the transaction.
-  void delete(String id) {
-    _transaction.delete(_collectionRef.doc(id));
-  }
+  void delete(String id) => _transaction.delete(_collectionRef.doc(id));
 }
