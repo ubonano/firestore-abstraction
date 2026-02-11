@@ -1,16 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Un cursor opaco para manejar la paginación en [FirestoreService].
+/// An opaque cursor for handling pagination in [FirestoreService].
 ///
-/// Encapsula un [DocumentSnapshot] para ser usado como punto de inicio o término
-/// en consultas paginadas, sin exponer directamente la dependencia de `cloud_firestore`
-/// a las capas superiores de la aplicación.
+/// Encapsulates a [DocumentSnapshot] to be used as a starting or ending point
+/// in paginated queries, without directly exposing the `cloud_firestore` dependency
+/// to the upper layers of the application.
 class FirestoreCursor {
-  /// El snapshot subyacente de Firestore.
+  /// The underlying Firestore snapshot.
   ///
-  /// NO debe ser usado fuera de la capa de infraestructura.
+  /// MUST NOT be used outside the infrastructure layer.
   final DocumentSnapshot snapshot;
 
-  /// Crea un nuevo [FirestoreCursor].
+  /// Creates a new [FirestoreCursor].
   const FirestoreCursor(this.snapshot);
 }

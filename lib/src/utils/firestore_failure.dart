@@ -3,6 +3,21 @@
 /// Wraps errors that occur during Firestore interactions, providing a [message],
 /// an optional error [code], and the [originalError] if available.
 class FirestoreFailure implements Exception {
+  /// Error code for document not found.
+  static const String codeNotFound = 'not-found';
+
+  /// Error code for permission denied.
+  static const String codePermissionDenied = 'permission-denied';
+
+  /// Error code for unknown error.
+  static const String codeUnknown = 'unknown';
+
+  /// Error code for document already exists.
+  static const String codeAlreadyExists = 'already-exists';
+
+  /// Error code for invalid argument.
+  static const String codeInvalidArgument = 'invalid-argument';
+
   /// A human-readable error message.
   final String message;
 
@@ -21,19 +36,22 @@ class FirestoreFailure implements Exception {
   /// Creates a failure representing a "document not found" error.
   ///
   /// [id] is the identifier of the document that was not found.
-  factory FirestoreFailure.notFound(String id) => FirestoreFailure('Documento no encontrado: $id', code: 'not-found');
+  factory FirestoreFailure.notFound(String id) => FirestoreFailure('Document not found: $id', code: codeNotFound);
 
   /// Creates a failure representing a "permission denied" error.
   factory FirestoreFailure.permissionDenied() =>
-      FirestoreFailure('Permisos insuficientes para realizar la operación', code: 'permission-denied');
+      FirestoreFailure('Insufficient permissions to perform the operation', code: codePermissionDenied);
 
   /// Creates a failure representing an unknown error.
   ///
   /// [error] is the original exception that occurred.
   factory FirestoreFailure.unknown(dynamic error) =>
-      FirestoreFailure('Ocurrió un error desconocido: $error', code: 'unknown', originalError: error);
+      FirestoreFailure('An unknown error occurred: $error', code: codeUnknown, originalError: error);
 
   /// Creates a failure representing a "document already exists" error.
   factory FirestoreFailure.alreadyExists(String id) =>
-      FirestoreFailure('El documento ya existe: $id', code: 'already-exists');
+      FirestoreFailure('Document already exists: $id', code: codeAlreadyExists);
+
+  /// Creates a failure representing an "invalid argument" error.
+  factory FirestoreFailure.invalidArgument(String message) => FirestoreFailure(message, code: codeInvalidArgument);
 }

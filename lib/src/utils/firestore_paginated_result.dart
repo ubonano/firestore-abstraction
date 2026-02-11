@@ -8,10 +8,9 @@ class FirestorePaginatedResult<T> {
   /// The list of items retrieved in this page.
   final List<T> items;
 
-  /// El cursor para la siguiente página de resultados.
+  /// The cursor for the next page of results.
   ///
-  /// Utiliza este cursor en la siguiente llamada a `query` para obtener
-  /// los resultados siguientes.
+  /// Use this cursor in the next `query` call to fetch the subsequent results.
   final FirestoreCursor? cursor;
 
   /// Creates a new [FirestorePaginatedResult].

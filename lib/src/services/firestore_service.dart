@@ -55,7 +55,7 @@ class FirestoreService<T extends FirestoreModelMixin> {
     try {
       return await action();
     } on FirebaseException catch (e) {
-      throw FirestoreFailure(e.message ?? 'Error de Firebase', code: e.code, originalError: e);
+      throw FirestoreFailure(e.message ?? 'Firebase Error', code: e.code, originalError: e);
     } catch (e) {
       throw FirestoreFailure.unknown(e);
     }
@@ -63,7 +63,7 @@ class FirestoreService<T extends FirestoreModelMixin> {
 
   Stream<R> _executeStream<R>(Stream<R> stream) => stream.handleError((e) {
     if (e is FirebaseException) {
-      throw FirestoreFailure(e.message ?? 'Error de Stream Firebase', code: e.code, originalError: e);
+      throw FirestoreFailure(e.message ?? 'Firebase Stream Error', code: e.code, originalError: e);
     }
     throw FirestoreFailure.unknown(e);
   });
