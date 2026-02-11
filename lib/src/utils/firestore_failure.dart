@@ -32,4 +32,8 @@ class FirestoreFailure implements Exception {
   /// [error] is the original exception that occurred.
   factory FirestoreFailure.unknown(dynamic error) =>
       FirestoreFailure('Ocurrió un error desconocido: $error', code: 'unknown', originalError: error);
+
+  /// Creates a failure representing a "document already exists" error.
+  factory FirestoreFailure.alreadyExists(String id) =>
+      FirestoreFailure('El documento ya existe: $id', code: 'already-exists');
 }

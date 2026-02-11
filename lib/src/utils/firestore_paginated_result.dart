@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firestore_cursor.dart';
 
 /// Represents a page of results from a paginated query.
 ///
@@ -8,11 +8,12 @@ class FirestorePaginatedResult<T> {
   /// The list of items retrieved in this page.
   final List<T> items;
 
-  /// The snapshot of the last document in this page.
+  /// El cursor para la siguiente página de resultados.
   ///
-  /// This is used to continue pagination in subsequent requests.
-  final DocumentSnapshot? lastDocumentSnapshot;
+  /// Utiliza este cursor en la siguiente llamada a `query` para obtener
+  /// los resultados siguientes.
+  final FirestoreCursor? cursor;
 
   /// Creates a new [FirestorePaginatedResult].
-  FirestorePaginatedResult(this.items, this.lastDocumentSnapshot);
+  FirestorePaginatedResult(this.items, this.cursor);
 }

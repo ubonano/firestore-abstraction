@@ -12,4 +12,3 @@ export 'src/utils/firestore_model_mixin.dart';
 export 'src/utils/firestore_paginated_result.dart';
 
 export 'src/utils/firestore_failure.dart';
-export 'src/utils/firestore_helper.dart';

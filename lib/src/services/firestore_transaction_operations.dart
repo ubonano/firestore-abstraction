@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_failure.dart';
-import '../utils/firestore_helper.dart';
 
 /// Helper class for managing transaction-scoped operations.
 ///
@@ -27,12 +26,17 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
   }
 
   /// Queues a create operation in the transaction.
-  void create(T item) {
-    final docRef = FirestoreHelper.getDocumentRef(
-      firestore: _firestore,
-      collectionPath: _collectionRef.path,
-      item: item,
-    );
+  ///
+  /// Throws [FirestoreFailure.alreadyExists] if the document already exists.
+  /// Note: This performs a read within the transaction.
+  Future<void> create(T item) async {
+    final docRef = _getDocumentRef(item);
+
+    // Check availability within transaction
+    final snapshot = await _transaction.get(docRef);
+    if (snapshot.exists) {
+      throw FirestoreFailure.alreadyExists(docRef.id);
+    }
 
     final data = item.toMap();
 
@@ -40,31 +44,18 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
   }
 
   /// Queues an update operation in the transaction.
-  void update(T item, {bool merge = true}) {
+  ///
+  /// Uses [update] semantics: fails if the document does not exist.
+  void update(T item) {
     if (item.id == null && item.ref == null) {
       throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
     }
 
-    final docRef = FirestoreHelper.getDocumentRef(
-      firestore: _firestore,
-      collectionPath: _collectionRef.path,
-      item: item,
-    );
+    final docRef = _getDocumentRef(item);
 
     final data = item.toMap();
 
-    _transaction.set(docRef, data, SetOptions(merge: merge));
-  }
-
-  /// Queues a partial update operation in the transaction.
-  ///
-
-  void updatePartial(String id, Map<String, dynamic> data) {
-    final docRef = _collectionRef.doc(id);
-
-    final dataToUpdate = Map<String, dynamic>.from(data);
-
-    _transaction.update(docRef, dataToUpdate);
+    _transaction.update(docRef, data);
   }
 
   /// Queues a delete operation in the transaction.
@@ -73,5 +64,15 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
       throw FirestoreFailure('El ID del documento no puede estar vacío', code: 'invalid-argument');
     }
     _transaction.delete(_collectionRef.doc(id));
+  }
+
+  DocumentReference<Map<String, dynamic>> _getDocumentRef(T item) {
+    if (item.ref != null) {
+      return _firestore.doc(item.ref!.path);
+    } else if (item.id != null && item.id!.isNotEmpty) {
+      return _firestore.collection(_collectionRef.path).doc(item.id);
+    } else {
+      return _firestore.collection(_collectionRef.path).doc();
+    }
   }
 }

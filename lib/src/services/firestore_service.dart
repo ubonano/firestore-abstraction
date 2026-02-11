@@ -3,7 +3,8 @@ import '../utils/firestore_model_mixin.dart';
 import '../utils/firestore_paginated_result.dart';
 
 import '../utils/firestore_failure.dart';
-import '../utils/firestore_helper.dart';
+
+import '../utils/firestore_cursor.dart';
 import 'firestore_transaction_operations.dart';
 
 typedef FromMap<T> = T Function(DocumentSnapshot<Map<String, dynamic>> snapshot);
@@ -43,135 +44,112 @@ class FirestoreService<T extends FirestoreModelMixin> {
   /// Returns the base [Query] for reading.
   ///
   /// Applies the type converter.
-  Query<T> get queryReference => firestore
-      .collection(collectionPath)
-      .withConverter<T>(fromFirestore: (snapshot, _) => fromMap(snapshot), toFirestore: (item, _) => toMap(item));
-
-  Query<T> get _queryRef => queryReference;
-
-  /// Returns a type-safe [CollectionReference] for this service.
+  /// The internal reference to the Firestore collection with converter applied.
   ///
-  /// This reference uses [withConverter] to automatically handle serialization
-  /// and deserialization of the model [T].
-  CollectionReference<T> get collectionReference => firestore
+  /// This is used for all read and write operations to ensure type safety.
+  CollectionReference<T> get _collectionRef => firestore
       .collection(collectionPath)
       .withConverter<T>(fromFirestore: (snapshot, _) => fromMap(snapshot), toFirestore: (item, _) => toMap(item));
+
+  Future<R> _execute<R>(Future<R> Function() action) async {
+    try {
+      return await action();
+    } on FirebaseException catch (e) {
+      throw FirestoreFailure(e.message ?? 'Error de Firebase', code: e.code, originalError: e);
+    } catch (e) {
+      throw FirestoreFailure.unknown(e);
+    }
+  }
+
+  Stream<R> _executeStream<R>(Stream<R> stream) => stream.handleError((e) {
+    if (e is FirebaseException) {
+      throw FirestoreFailure(e.message ?? 'Error de Stream Firebase', code: e.code, originalError: e);
+    }
+    throw FirestoreFailure.unknown(e);
+  });
+
+  /// Executes a Firestore transaction with standardized error handling.
+  Future<R> runTransaction<R>(Future<R> Function(Transaction transaction) action) async =>
+      _execute(() async => await firestore.runTransaction(action));
 
   /// Fetches a single document by its [id].
   ///
   /// Returns `null` if the document does not exist.
-  Future<T?> get(String id, {GetOptions? options}) => FirestoreHelper.execute(() async {
-    final docRef = collectionReference.doc(id);
-    final snapshot = await docRef.get(options);
+  Future<T?> get(String id) => _execute(() async {
+    final docRef = _collectionRef.doc(id);
+    final snapshot = await docRef.get();
     if (!snapshot.exists || snapshot.data() == null) return null;
     return snapshot.data();
   });
 
   /// Checks if a document exists.
-  Future<bool> exists(String id, {GetOptions? options}) => FirestoreHelper.execute(() async {
+  Future<bool> exists(String id) => _execute(() async {
     final docRef = firestore.collection(collectionPath).doc(id);
-    final snapshot = await docRef.get(options);
+    final snapshot = await docRef.get();
     return snapshot.exists;
   });
 
-  /// Fetches all documents matching the optional [queryBuilder].
-  Future<List<T>> getAll({QueryBuilder<T>? queryBuilder, GetOptions? options}) => FirestoreHelper.execute(() async {
-    Query<T> query = _queryRef;
-    if (queryBuilder != null) {
-      query = queryBuilder(query);
-    }
-    final querySnapshot = await query.get(options);
-    return querySnapshot.docs.map((doc) => doc.data()).toList();
-  });
-
   /// Streams real-time updates for a list of documents.
-  Stream<List<T>> streamAll({QueryBuilder<T>? queryBuilder, bool includeMetadataChanges = false}) {
-    Query<T> query = _queryRef;
+  ///
+  /// [limit] defaults to 20.
+  Stream<FirestorePaginatedResult<T>> streamList({
+    QueryBuilder<T>? queryBuilder,
+    int limit = 20,
+    FirestoreCursor? startAfter,
+  }) {
+    Query<T> query = _collectionRef;
     if (queryBuilder != null) {
       query = queryBuilder(query);
     }
-    return FirestoreHelper.executeStream(
-      query
-          .snapshots(includeMetadataChanges: includeMetadataChanges)
-          .map((snapshot) => snapshot.docs.map((d) => d.data()).toList()),
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter.snapshot);
+    }
+
+    // Apply limit
+    query = query.limit(limit);
+
+    return _executeStream(
+      query.snapshots().map((snapshot) {
+        final items = snapshot.docs.map((d) => d.data()).toList();
+        final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+        return FirestorePaginatedResult(items, lastDoc != null ? FirestoreCursor(lastDoc) : null);
+      }),
     );
   }
 
   /// Streams real-time updates for a single document.
-  Stream<T?> streamDocument(String id, {bool includeMetadataChanges = false}) => FirestoreHelper.executeStream(
-    collectionReference.doc(id).snapshots(includeMetadataChanges: includeMetadataChanges).map((snapshot) {
+  Stream<T?> streamDocument(String id) => _executeStream(
+    _collectionRef.doc(id).snapshots().map((snapshot) {
       if (!snapshot.exists || snapshot.data() == null) return null;
       return snapshot.data();
     }),
   );
 
   /// Performs a paginated query and returns the results along with the cursor for the next page.
-  Future<FirestorePaginatedResult<T>> query(QueryBuilder<T>? queryBuilder, {GetOptions? options}) =>
-      FirestoreHelper.execute(() async {
-        Query<T> query = _queryRef;
-        if (queryBuilder != null) {
-          query = queryBuilder(query);
-        }
-        final querySnapshot = await query.get(options);
-        final items = querySnapshot.docs.map((doc) => doc.data()).toList();
-        final lastDoc = querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null;
-        return FirestorePaginatedResult(items, lastDoc);
-      });
-
-  /// Creates a new document in the collection.
   ///
-  /// If the [item] has a [ref] or an [id] already set, it will attempt to use that
-  /// specific document location. Otherwise, a new random ID is generated.
-  ///
-  /// returns the ID of the created document.
-  Future<String> create(T item) => FirestoreHelper.execute(() async {
-    final docRef = FirestoreHelper.getDocumentRef(firestore: firestore, collectionPath: collectionPath, item: item);
-
-    final data = toMap(item);
-
-    await docRef.set(data);
-    return docRef.id;
-  });
-
-  /// Updates an existing document in the collection.
-  ///
-  /// [item] must have a valid [id] or [ref]. If [merge] is true (default),
-  /// the update mimics a PATCH operation, only updating the fields present in the map.
-  /// If [merge] is false, it overwrites the entire document.
-  ///
-  /// Throws an [Exception] if the item has no identity.
-  Future<void> update(T item, {bool merge = true}) => FirestoreHelper.execute(() async {
-    if (item.id == null && item.ref == null) {
-      throw FirestoreFailure('No se puede actualizar un documento sin ID o Referencia', code: 'invalid-argument');
+  /// [limit] defaults to 20 and is capped at 100.
+  Future<FirestorePaginatedResult<T>> query({
+    QueryBuilder<T>? queryBuilder,
+    int limit = 20,
+    FirestoreCursor? startAfter,
+  }) => _execute(() async {
+    Query<T> query = _collectionRef;
+    if (queryBuilder != null) {
+      query = queryBuilder(query);
     }
 
-    final docRef = FirestoreHelper.getDocumentRef(firestore: firestore, collectionPath: collectionPath, item: item);
-
-    final data = toMap(item);
-
-    await docRef.set(data, SetOptions(merge: merge));
-  });
-
-  /// Updates specific fields of a document without overwriting the entire document.
-  ///
-  /// This method allows for atomic updates using [FieldValue]s (e.g., [FieldValue.increment],
-  /// [FieldValue.arrayUnion]).
-  ///
-  /// [data] must not contain the `id` or `ref` as keys.
-  Future<void> updatePartial(String id, Map<String, dynamic> data) => FirestoreHelper.execute(() async {
-    final docRef = collectionReference.doc(id);
-
-    final dataToUpdate = Map<String, dynamic>.from(data);
-
-    await docRef.update(dataToUpdate);
-  });
-
-  /// Deletes a document by its [id].
-  Future<void> delete(String id) => FirestoreHelper.execute(() async {
-    if (id.isEmpty) {
-      throw FirestoreFailure('El ID del documento no puede estar vacío', code: 'invalid-argument');
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter.snapshot);
     }
-    await collectionReference.doc(id).delete();
+
+    // Apply limit
+    query = query.limit(limit);
+
+    final querySnapshot = await query.get();
+    final items = querySnapshot.docs.map((doc) => doc.data()).toList();
+    final lastDoc = querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null;
+    return FirestorePaginatedResult(items, lastDoc != null ? FirestoreCursor(lastDoc) : null);
   });
 
   /// Provides access to transaction-scoped operations.
@@ -179,5 +157,5 @@ class FirestoreService<T extends FirestoreModelMixin> {
   /// Returns a [FirestoreTransactionOperations] helper to perform reads and writes
   /// within the context of the provided [transaction].
   FirestoreTransactionOperations<T> withTransaction(Transaction transaction) =>
-      FirestoreTransactionOperations(transaction, collectionReference, firestore);
+      FirestoreTransactionOperations(transaction, _collectionRef, firestore);
 }

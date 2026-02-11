@@ -20,6 +20,10 @@ mixin FirestoreModelMixin {
   String? get id => ref?.id ?? _id;
 
   /// Sets the unique identifier of the document.
+  ///
+  /// **Note:** This only sets the local ID. If [ref] is already set, [id] getter will return
+  /// [ref.id] regardless of this value. Use strict caution when manually setting IDs on
+  /// objects that might already be attached to a Firestore reference.
   set id(String? value) => _id = value;
 
   /// Converts the object to a [Map] representation for Firestore.
