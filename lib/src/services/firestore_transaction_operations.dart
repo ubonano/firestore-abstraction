@@ -32,6 +32,10 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
   Future<void> create(T item) async {
     final docRef = _getDocumentRef(item);
 
+    // Asignamos la referencia y el ID al item para que el caller tenga acceso al ID generado
+    item.ref = docRef;
+    item.id = docRef.id;
+
     // Check availability within transaction
     final snapshot = await _transaction.get(docRef);
     if (snapshot.exists) {
@@ -64,6 +68,26 @@ class FirestoreTransactionOperations<T extends FirestoreModelMixin> {
       throw FirestoreFailure('El ID del documento no puede estar vacío', code: 'invalid-argument');
     }
     _transaction.delete(_collectionRef.doc(id));
+  }
+
+  /// Realiza una actualización atómica segura utilizando una función transformadora.
+  ///
+  /// Lee el documento actual, aplica la función [transform] y guarda el resultado.
+  /// Lanza [FirestoreFailure.notFound] si el documento no existe.
+  Future<void> updateAtomic(String id, T Function(T current) transform) async {
+    final doc = await get(id);
+    if (doc == null) {
+      throw FirestoreFailure.notFound(id);
+    }
+
+    final updatedDoc = transform(doc);
+
+    // Aseguramos que el ID se mantenga para la actualización si por alguna razón se perdió
+    if (updatedDoc.id == null && updatedDoc.ref == null) {
+      updatedDoc.id = id;
+    }
+
+    update(updatedDoc);
   }
 
   DocumentReference<Map<String, dynamic>> _getDocumentRef(T item) {
